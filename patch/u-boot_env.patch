@@ -1,0 +1,61 @@
+diff --git a/board/st/stm32f746-disco/stm32f746-disco.c b/board/st/stm32f746-disco/stm32f746-disco.c
+index e21cfc6e49..84def368b5 100644
+--- a/board/st/stm32f746-disco/stm32f746-disco.c
++++ b/board/st/stm32f746-disco/stm32f746-disco.c
+@@ -138,10 +138,13 @@ int board_late_init(void)
+ 				   &gpio, GPIOD_IS_IN);
+ 
+ 	if (dm_gpio_is_valid(&gpio)) {
+-		if (dm_gpio_get_value(&gpio))
++		if (dm_gpio_get_value(&gpio)) {
++			env_set("button", "HIGH");
+ 			puts("usr button is at HIGH LEVEL\n");
+-		else
++		} else {
++			env_set("button", "LOW");
+ 			puts("usr button is at LOW LEVEL\n");
++		}
+ 	}
+ 
+ 	return 0;
+diff --git a/configs/stm32f746-disco_defconfig b/configs/stm32f746-disco_defconfig
+index aa7403f3c5..5d01d1be04 100644
+--- a/configs/stm32f746-disco_defconfig
++++ b/configs/stm32f746-disco_defconfig
+@@ -8,7 +8,7 @@ CONFIG_DEFAULT_DEVICE_TREE="stm32f746-disco"
+ CONFIG_ENV_VARS_UBOOT_CONFIG=y
+ CONFIG_BOOTDELAY=3
+ CONFIG_USE_BOOTARGS=y
+-CONFIG_BOOTARGS="console=ttyS0,115200 earlyprintk consoleblank=0 ignore_loglevel"
++CONFIG_BOOTARGS="console=ttySTM0,115200 earlyprintk consoleblank=0 ignore_loglevel"
+ # CONFIG_DISPLAY_CPUINFO is not set
+ # CONFIG_DISPLAY_BOARDINFO is not set
+ CONFIG_BOARD_EARLY_INIT_F=y
+diff --git a/include/configs/stm32f746-disco.h b/include/configs/stm32f746-disco.h
+index 567e7f2a00..f49ba52e2d 100644
+--- a/include/configs/stm32f746-disco.h
++++ b/include/configs/stm32f746-disco.h
+@@ -47,12 +47,19 @@
+ #define CONFIG_SYS_MALLOC_LEN		(1 * 1024 * 1024)
+ 
+ #define CONFIG_BOOTCOMMAND						\
+-	"run bootcmd_romfs"
++	"run conditionalboot"
+ 
+ #define CONFIG_EXTRA_ENV_SETTINGS \
+-	"bootargs_romfs=uclinux.physaddr=0x08180000 root=/dev/mtdblock0\0" \
+-	"bootcmd_romfs=setenv bootargs ${bootargs} ${bootargs_romfs};" \
+-	"bootm 0x08044000 - 0x08042000\0"
++	"ipaddr=10.0.222.100\0" \
++	"serverip=10.0.222.9\0" \
++	"dtb_file=stm32f746-disco.dtb\0" \
++	"kernel_file=zImage\0" \
++	"dtb_addr=0xc0700000\0" \
++	"kernel_addr=0xc0008000\0" \
++	"netboot=tftp ${dtb_addr} ${dtb_file} && tftp ${kernel_addr} ${kernel_file} && bootz ${kernel_addr} - ${dtb_addr}\0" \
++	"spiboot=sf probe && sf read ${dtb_addr} 0 4000 && sf read ${kernel_addr} 10000 200000 && bootz ${kernel_addr} - ${dtb_addr}\0" \
++	"updatespi=sf probe && tftp ${dtb_addr} ${dtb_file} && sf erase 0 10000 && sf write ${dtb_addr} 0 ${filesize} && tftp ${kernel_addr} ${kernel_file} && sf erase 10000 200000 && sf write ${kernel_addr} 10000 ${filesize}\0" \
++	"conditionalboot=if test \"${button}\" = \"HIGH\"; then run updatespi; fi; run spiboot\0"
+ 
+ 
+ /*
